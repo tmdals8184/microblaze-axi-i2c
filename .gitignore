@@ -1,5 +1,2 @@
 !.gitignore
 !README.md
-vivado*
-microblaze-axi-i2c*
-!microblaze-axi-i2c.srcs
