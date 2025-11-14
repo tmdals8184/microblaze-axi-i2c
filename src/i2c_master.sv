@@ -6,6 +6,7 @@ module i2c_master (
     input  logic       reset,
     // internal signal
     input  logic       i2c_en,
+    input  logic       i2c_trig,
     input  logic       i2c_start,
     input  logic       i2c_stop,
     input  logic       i2c_ack,
@@ -104,14 +105,11 @@ module i2c_master (
         rx_done        = 1'b0;
         case (state)
             IDLE: begin
-                tx_ready = 1'b1;
-                if (i2c_en) begin
-                    state_next = HOLD;
-                end
+                if (i2c_en) state_next = START;
             end
             HOLD: begin
                 tx_ready = 1'b1;
-                if (i2c_en) begin
+                if (i2c_trig) begin
                     case ({
                         i2c_start, i2c_stop
                     })
@@ -153,6 +151,7 @@ module i2c_master (
                         phase_cnt_next = 0;
                         if (bit_cnt_reg == 7) begin
                             bit_cnt_next = 0;
+                            tx_done      = 1'b1;
                             state_next   = ACK;
                         end else begin
                             bit_cnt_next = bit_cnt_reg + 1;
@@ -191,7 +190,7 @@ module i2c_master (
                     if (phase_cnt_reg == 1 && !rdwr_reg) ack_next = SDA;
                     if (phase_cnt_reg == 3) begin
                         phase_cnt_next = 0;
-                        tx_done        = 1'b1;
+                        // tx_done        = 1'b1;
                         rx_done        = (ack_reg) ? 1'b1 : 1'b0;
                         state_next     = (ack_reg) ? STOP : HOLD;
                     end else begin
