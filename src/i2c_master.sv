@@ -19,7 +19,7 @@ module i2c_master (
     inout  logic       SDA,
     output logic       SCL
 );
-
+    localparam ACK = 1'b0, NACK = 1'b1;
     typedef enum {
         IDLE,
         HOLD,
@@ -27,38 +27,39 @@ module i2c_master (
         STOP,
         WRITE,
         READ,
-        ACK
+        ACK_RW
     } state_t;
     state_t state, state_next;
+    logic ack_reg, ack_next;
     logic sda_en, sda_out;
     logic [7:0] tx_data_reg, tx_data_next;
     logic [7:0] rx_data_reg, rx_data_next;
     logic [8:0] clk_cnt_reg, clk_cnt_next;
     logic [2:0] bit_cnt_reg, bit_cnt_next;
     logic [1:0] phase_cnt_reg, phase_cnt_next;
-    logic ack_reg, ack_next;
     logic rdwr_reg, rdwr_next;
 
     assign SDA = sda_en ? sda_out : 1'bz;
+    assign rx_data = rx_data_reg;
 
     always_ff @(posedge clk, posedge reset) begin
         if (reset) begin
             state         <= IDLE;
+            ack_reg       <= ACK;
             tx_data_reg   <= 0;
             rx_data_reg   <= 0;
             clk_cnt_reg   <= 0;
             bit_cnt_reg   <= 0;
             phase_cnt_reg <= 0;
-            ack_reg       <= 0;
             rdwr_reg      <= 0;
         end else begin
             state         <= state_next;
+            ack_reg       <= ack_next;
             tx_data_reg   <= tx_data_next;
             rx_data_reg   <= rx_data_next;
             clk_cnt_reg   <= clk_cnt_next;
             bit_cnt_reg   <= bit_cnt_next;
             phase_cnt_reg <= phase_cnt_next;
-            ack_reg       <= ack_next;
             rdwr_reg      <= rdwr_next;
         end
     end
@@ -68,21 +69,21 @@ module i2c_master (
         sda_out = 1'b1;
         SCL     = 1'b1;
         case (state)
-            READ: sda_en = 1'b0;
-            ACK:  sda_en = (rdwr_reg) ? 1'b1 : 1'b0;
+            READ:   sda_en = 1'b0;
+            ACK_RW: sda_en = (rdwr_reg) ? 1'b1 : 1'b0;
         endcase
         case (state)
             IDLE, HOLD: sda_out = 1'b1;
             START:      sda_out = 1'b0;
             STOP:       sda_out = (phase_cnt_reg == 1) ? 1'b1 : 1'b0;
             WRITE:      sda_out = tx_data_reg[7];
-            ACK:        sda_out = (ack_reg) ? 1'b0 : 1'b1;
+            ACK_RW:     sda_out = (ack_reg == NACK);
         endcase
         case (state)
             IDLE, STOP: SCL = 1'b1;
             HOLD:       SCL = 1'b0;
             START:      SCL = (phase_cnt_reg == 1) ? 1'b0 : 1'b1;
-            WRITE, READ, ACK: begin
+            WRITE, READ, ACK_RW: begin
                 case (phase_cnt_reg)
                     2'd0, 2'd3: SCL = 1'b0;
                     2'd1, 2'd2: SCL = 1'b1;
@@ -126,6 +127,7 @@ module i2c_master (
                         end
                         2'b11: begin  // read
                             rdwr_next  = 1'b1;
+                            ack_next   = i2c_ack;
                             state_next = READ;
                         end
                     endcase
@@ -152,7 +154,7 @@ module i2c_master (
                         if (bit_cnt_reg == 7) begin
                             bit_cnt_next = 0;
                             tx_done      = 1'b1;
-                            state_next   = ACK;
+                            state_next   = ACK_RW;
                         end else begin
                             bit_cnt_next = bit_cnt_reg + 1;
                             tx_data_next = {tx_data_reg[6:0], 1'b0};
@@ -173,7 +175,7 @@ module i2c_master (
                         phase_cnt_next = 0;
                         if (bit_cnt_reg == 7) begin
                             bit_cnt_next = 0;
-                            state_next   = ACK;
+                            state_next   = ACK_RW;
                         end else begin
                             bit_cnt_next = bit_cnt_reg + 1;
                         end
@@ -184,10 +186,11 @@ module i2c_master (
                     clk_cnt_next = clk_cnt_reg + 1;
                 end
             end
-            ACK: begin
+            ACK_RW: begin
                 if (clk_cnt_reg == 249) begin
                     clk_cnt_next = 0;
-                    if (phase_cnt_reg == 1 && !rdwr_reg) ack_next = SDA;
+                    if (phase_cnt_reg == 1 && !rdwr_reg)
+                        ack_next = SDA ? NACK : ACK;
                     if (phase_cnt_reg == 3) begin
                         phase_cnt_next = 0;
                         // tx_done        = 1'b1;

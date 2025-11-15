@@ -23,7 +23,7 @@ module tb_i2c_master ();
     logic [7:0] recv_data;
     // external signal
     // wire        SDA = tb_sda_en ? tb_sda_out : 1'bz;
-    wire       SDA;
+    wire        SDA;
     logic       SCL;
     // for verify
     logic       tb_sda_en;
@@ -69,7 +69,17 @@ module tb_i2c_master ();
     initial begin
         repeat (5) @(posedge m_clk);
         mst_init();
-        mst_send(WRITE, 8'hf0);
+        // mst_send(START);
+        mst_send(WRITE, 8'ha0);
+        mst_send(WRITE, 8'h0f);
+        mst_send(START);
+        mst_send(WRITE, 8'ha1);
+        slv_send(8'haa);
+        mst_send(READ, , ACK);
+        slv_send(8'h55);
+        mst_send(READ, , NACK);        
+        mst_send(STOP);
+
         // slv_send_ack(ACK);
     end
 
@@ -78,19 +88,28 @@ module tb_i2c_master ();
         @(posedge m_clk);
         wait (tx_ready);
         @(posedge m_clk);
-    endtask //automatic
+    endtask  //automatic
 
-    task automatic mst_send(set_e status, byte data = 8'hxx);
+    task automatic mst_send(set_e status, byte data = 8'hxx, ack_e ack = ACK);
         wait (tx_ready);
         @(posedge m_clk);
         if (status == WRITE) begin
             tx_data = data;
             @(posedge m_clk);
         end
-        i2c_trig = 1'b1;
+        i2c_trig              = 1'b1;
+        i2c_ack               = ack;
         {i2c_stop, i2c_start} = status;
         @(posedge m_clk);
         i2c_trig = 1'b0;
+        {i2c_stop, i2c_start} = 0;
+        @(posedge m_clk);
+        if (STOP) i2c_en = 1'b0;
+    endtask  //automatic
+
+    task automatic slv_send(byte data);
+        @(posedge m_clk);
+        send_data = data;
         @(posedge m_clk);
     endtask  //automatic
 
