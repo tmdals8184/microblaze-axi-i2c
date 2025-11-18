@@ -12,22 +12,26 @@ module tb_i2c_master ();
     logic       i2c_trig;
     logic       i2c_start;
     logic       i2c_stop;
-    logic       i2c_ack;
-    logic [7:0] tx_data;
-    logic       tx_done;
-    logic       tx_ready;
-    logic [7:0] rx_data;
-    logic       rx_done;
+    logic       i2c_mack;
+    logic [7:0] i2c_tdr;
+    logic       i2c_ready;
+    logic [7:0] i2c_rdr;
+    logic [5:0] i2c_sr;
     // slv internal signal
     logic [7:0] send_data;
     logic [7:0] recv_data;
+    logic send_done, recv_done, send_ready, is_send;
     // external signal
     // wire        SDA = tb_sda_en ? tb_sda_out : 1'bz;
-    wire        SDA;
-    logic       SCL;
+    wire SDA;
+    logic SCL;
     // for verify
-    logic       tb_sda_en;
-    logic       tb_sda_out;
+    logic tb_sda_en;
+    logic tb_sda_out;
+    // handler
+    logic [7:0] led;
+    logic [7:0] sw;
+
 
     i2c_master dut_mst (
         .clk  (m_clk),
@@ -41,6 +45,13 @@ module tb_i2c_master ();
         .SDA  (SDA),
         .*
     );
+    // i2c_handler dut_handler (
+    //     .clk  (s_clk),
+    //     .reset(s_reset),
+    //     .led(led),
+    //     .sw (sw),
+    //     .*
+    // );
 
     typedef enum logic [1:0] {
         WRITE,
@@ -68,17 +79,22 @@ module tb_i2c_master ();
 
     initial begin
         repeat (5) @(posedge m_clk);
+        repeat (100) @(posedge m_clk);
         mst_init();
         // mst_send(START);
         mst_send(WRITE, 8'ha0);
+        mst_send(WRITE, 8'haa);
+        mst_send(WRITE, 8'hff);
+        mst_send(WRITE, 8'haa);
         mst_send(WRITE, 8'h0f);
+
         mst_send(START);
         mst_send(WRITE, 8'ha1);
         slv_send(8'haa);
-        mst_send(READ, , ACK);
+        mst_send(READ,, ACK);
         slv_send(8'h55);
-        mst_send(READ, , NACK);        
-        mst_send(STOP);
+        mst_send(READ,, NACK);
+        // mst_send(STOP);
 
         // slv_send_ack(ACK);
     end
@@ -86,25 +102,26 @@ module tb_i2c_master ();
     task automatic mst_init();
         i2c_en = 1'b1;
         @(posedge m_clk);
-        wait (tx_ready);
+        wait (i2c_ready);
         @(posedge m_clk);
     endtask  //automatic
 
     task automatic mst_send(set_e status, byte data = 8'hxx, ack_e ack = ACK);
-        wait (tx_ready);
+        wait (i2c_ready);
         @(posedge m_clk);
         if (status == WRITE) begin
-            tx_data = data;
+            i2c_tdr = data;
             @(posedge m_clk);
         end
         i2c_trig              = 1'b1;
-        i2c_ack               = ack;
+        i2c_mack              = ack;
         {i2c_stop, i2c_start} = status;
+        if (status == STOP || (status == READ && ack == NACK)) i2c_en = 1'b0;
         @(posedge m_clk);
-        i2c_trig = 1'b0;
+        i2c_trig              = 1'b0;
         {i2c_stop, i2c_start} = 0;
+        i2c_mack              = ACK;
         @(posedge m_clk);
-        if (STOP) i2c_en = 1'b0;
     endtask  //automatic
 
     task automatic slv_send(byte data);
@@ -121,7 +138,7 @@ module tb_i2c_master ();
         tb_sda_en  = 1'b1;
         tb_sda_out = ack;
         @(posedge m_clk);
-        wait (tx_ready);
+        wait (i2c_ready);
         tb_sda_en = 1'b0;
     endtask  //automatic
     */
