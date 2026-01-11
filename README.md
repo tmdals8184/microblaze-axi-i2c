@@ -1,1 +1,1 @@
-# microblaze-axi-i2c
+# Serial Communication : SPI & I2C
