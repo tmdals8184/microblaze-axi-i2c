@@ -97,8 +97,7 @@ if { $validate_required } {
 
 # Create project
 set today [clock format [clock seconds] -format "%y%m%d"]
-set proj_num "04"
-set proj_folder "${proj_num}_${today}_${_xil_proj_name_}"
+set proj_folder "${today}_${_xil_proj_name_}"
 create_project ${_xil_proj_name_} ./${proj_folder} -part xc7a35tcpg236-1
 
 # Set the directory path for the new project
@@ -128,6 +127,8 @@ set obj [get_filesets sources_1]
 # Add local files from the original project (-no_copy_sources specified)
 set files [list \
  [file normalize "${origin_dir}/../src/i2c_master.sv" ]\
+ [file normalize "${origin_dir}/../src/i2c_slave.sv" ]\
+ [file normalize "${origin_dir}/../src/common.sv" ]\
 ]
 set added_files [add_files -fileset sources_1 $files]
 
@@ -427,7 +428,7 @@ set_property -name "options.warn_on_violation" -value "1" -objects $obj
 
 }
 set obj [get_runs impl_1]
-set_property -name "auto_incremental_checkpoint.directory" -value "D:/work/harman/251111_I2C_Master/251111_I2C_Master.srcs/utils_1/imports/impl_1" -objects $obj
+set_property -name "auto_incremental_checkpoint.directory" -value "F:/work/fpga/251111_I2C_Master/251111_I2C_Master.srcs/utils_1/imports/impl_1" -objects $obj
 set_property -name "strategy" -value "Vivado Implementation Defaults" -objects $obj
 set_property -name "steps.write_bitstream.args.readback_file" -value "0" -objects $obj
 set_property -name "steps.write_bitstream.args.verbose" -value "0" -objects $obj
